@@ -1,44 +1,61 @@
-const cards = (state, action) => {
-    switch (action.type) {
-        case 'ADD_CARD':
-        let newCard = Object.assign({},action.data,{
-            score:1,
-            id: +new Date
-        });
-        return state.concat([newCard]);
-        default:
-        return state || [];
-    }
+import React from 'react';
+import ReactDOM from 'react-dom';
+import { createStore, combineReducers, applyMiddleware } from 'redux'
+import { Provider } from 'react-redux';
+import { Router, Route, browserHistory } from 'react-router';
+import { syncHistoryWithStore, routerReducer } from 'react-router-redux';
+import thunkMiddleware from 'redux-thunk';
+import { fetchData } from './actions';
+import * as reducers from './reducers';
+reducers.routing = routerReducer;
+
+console.log(React);
+
+import App from './components/App';
+import VisibleCards from './components/VisibleCards';
+import NewCardModal from './components/NewCardModal';
+import EditCardModal from './components/EditCardModal';
+import StudyModal from './components/StudyModal';
+
+const store = createStore(combineReducers(reducers), applyMiddleware(thunkMiddleware));
+const history = syncHistoryWithStore(browserHistory, store);
+
+function run () {
+  let state = store.getState();
+  ReactDOM.render((<Provider store={store}>
+    <Router history={history}>
+      <Route path='/' component={App}>
+        <Route path='/deck/:deckId' component={VisibleCards}>
+          <Route path='/deck/:deckId/new' component={NewCardModal} />
+          <Route path='/deck/:deckId/edit/:cardId' component={EditCardModal} />
+          <Route path='/deck/:deckId/study' component={StudyModal} />
+        </Route>
+      </Route>
+    </Router>
+  </Provider>), document.getElementById('root'));
 }
 
-const store = Redux.createStore(Redux.combineReducers({
-    cards: cards
-}));
-    
-const App = (props) => {
-    return (
-        <div className='app'>
-        <h1>{props.children}</h1>
-        </div>
-);
-};
+function save() {
+  var state = store.getState();
 
+  fetch('/api/data', {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      decks: state.decks,
+      cards: state.cards
+    })
+  });
+}
 
-class Sidebar extends React.Component {
-    render() {
-        let props = this.props;
-        return (<div className='sidebar'>
-            <h2> All Decks </h2>
-            <ul>
-                {props.decks.map((deck,i) => 
-                <li key={i}> {deck.name} </li>
-                )}
-            </ul>
-            { props.addingDeck && <input ref='add' />}
-            </div>);
-    }
-};
+function init () {
+  run();
+  store.subscribe(run);
+  store.subscribe(save);
+  store.dispatch(fetchData());
+}
 
-ReactDOM.render((<App>
-    <Sidebar decks={[ {name: 'Deck 1' }]} addingDeck={true} />
-</App>),document.getElementById('root'));
+init();
